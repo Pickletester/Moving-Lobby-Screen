@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>LED Ad Loop – 4K</title>
+
+  <style>
+    :root{
+      --bg:#000;
+      --fit:contain;
+    }
+
+    html, body{
+      margin:0;
+      padding:0;
+      width:100%;
+      height:100%;
+      background:var(--bg);
+      overflow:hidden;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    #stage{
+      width:3840px;
+      height:2160px;
+      background:var(--bg);
+      position:relative;
+      overflow:hidden;
+      transform-origin: top left;
+    }
+
+    #stageScaler{
+      width:100vw;
+      height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:var(--bg);
+    }
+
+    img#ad{
+      width:100%;
+      height:100%;
+      object-fit:var(--fit);
+      background:var(--bg);
+      display:block;
+    }
+  </style>
+</head>
+<body>
+  <div id="stageScaler">
+    <div id="stage">
+      <img id="ad" alt="Advertisement" />
+    </div>
+  </div>
+
+<script>
+const img = document.getElementById("ad");
+let ads = [];
+let index = 0;
+
+async function loadConfig(){
+  const res = await fetch("config_4k.json?v=" + Date.now(), { cache: "no-store" });
+  return res.json();
+}
+
+async function loadAds(cfg){
+  const owner = location.hostname.split(".github.io")[0];
+  const parts = location.pathname.split("/").filter(Boolean);
+  const repo = parts.length ? parts[0] : location.hostname;
+
+  const api = `https://api.github.com/repos/${owner}/${repo}/contents/${cfg.adsFolder}?ref=main`;
+  const res = await fetch(api, { cache: "no-store" });
+  const data = await res.json();
+
+  ads = data
+    .filter(f => f.type === "file" && f.name.match(/\.(png|jpg|jpeg|webp|gif)$/i))
+    .map(f => f.download_url);
+
+  if (ads.length === 0 && cfg.fallbackImages?.length) {
+    ads = cfg.fallbackImages;
+  }
+
+  img.src = ads[0] + "?v=" + Date.now();
+
+  if (ads.length > 1) {
+    setInterval(() => {
+      index = (index + 1) % ads.length;
+      img.src = ads[index] + "?v=" + Date.now();
+    }, cfg.durationMs || 6000);
+  }
+}
+
+(async () => {
+  const cfg = await loadConfig();
+  document.documentElement.style.setProperty("--bg", cfg.bg || "#000");
+  document.documentElement.style.setProperty("--fit", cfg.fit || "contain");
+  await loadAds(cfg);
+})();
+</script>
+</body>
+</html>
